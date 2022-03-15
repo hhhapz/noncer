@@ -86,12 +86,12 @@ func SelectFolder(im *imap.Dialer, folder string) (err error) {
 	return nil
 }
 
-var allowedDomains = []string{"@google.com", "@golang.org", "@hamzantal.pw"}
+var AllowedDomains []string
 
 func valid(email *imap.Email) bool {
 	for addr := range email.From {
 		var ok bool
-		for _, domain := range allowedDomains {
+		for _, domain := range AllowedDomains {
 			if strings.HasSuffix(addr, domain) {
 				ok = true
 				break

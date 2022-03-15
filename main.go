@@ -6,13 +6,15 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/BrianLeishman/go-imap"
 	"io"
 	"net/http"
-	"os"
-	"os/signal"
+	"strings"
 	"syscall"
 
-	"github.com/BrianLeishman/go-imap"
+	"os"
+	"os/signal"
+
 	"github.com/bwmarrin/lit"
 	"github.com/hhhapz/noncer/announcements"
 )
@@ -25,17 +27,33 @@ func main() {
 }
 
 var (
-	verbose = flag.Bool("v", false, "verbose imap output")
-	user    = flag.String("user", "", "imap username")
-	pass    = flag.String("pass", "", "imap password")
-	host    = flag.String("host", "imap.transip.email", "imap host")
-	port    = flag.Int("port", 993, "imap port")
-	period  = flag.Int("period", 60, "email fetch period")
-	webhook = flag.String("webhook", "", "webhook url")
+	verbose   = flag.Bool("v", false, "verbose imap output")
+	user      = flag.String("user", "", "imap username")
+	pass      = flag.String("pass", "", "imap password")
+	host      = flag.String("host", "imap.transip.email", "imap host")
+	port      = flag.Int("port", 993, "imap port")
+	period    = flag.Int("period", 60, "email fetch period")
+	webhook   = flag.String("webhook", "", "webhook url")
+	allowList allowListFlags
 )
 
+type allowListFlags []string
+
+func (i *allowListFlags) String() string {
+	return strings.Join(*i, ",")
+}
+
+func (i *allowListFlags) Set(value string) error {
+	*i = append(*i, value)
+	return nil
+}
+
 func run(ctx context.Context) error {
+	flag.Var(&allowList, "allowlist", "allow list for source email addresses")
 	flag.Parse()
+
+	announcements.AllowedDomains = allowList
+
 	if *webhook == "" {
 		return fmt.Errorf("webhook url must be provided")
 	}
@@ -96,9 +114,3 @@ func sendWebhook(ctx context.Context, a announcements.Announcement) error {
 type Webhook struct {
 	Content string `json:"content"`
 }
-
-type WebhookType int
-
-const (
-	WebhookTypeIncoming WebhookType = 1
-)
