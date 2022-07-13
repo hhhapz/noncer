@@ -56,7 +56,7 @@ func Listen(ctx context.Context, im *imap.Dialer, announcements chan<- Announcem
 					continue
 				}
 
-				announcements <- formatAnnouncement(2000, email.Subject, contents)
+				announcements <- formatAnnouncement(1990, email.Subject, contents)
 			}
 
 			// no emails were found, so dont bother removing nothing
