@@ -93,21 +93,32 @@ func run(ctx context.Context) error {
 
 func sendWebhook(ctx context.Context, a announcements.Announcement) error {
 	buf := new(bytes.Buffer)
-	json.NewEncoder(buf).Encode(Webhook{fmt.Sprintf("**%s**\n\n%s", a.Subject, a.Contents)})
-	req, err := http.NewRequestWithContext(ctx, "POST", *webhook, buf)
-	req.Header.Set("Content-Type", "application/json")
-	if err != nil {
-		return err
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
+	for i := range a.Contents {
 		buf.Reset()
-		io.Copy(buf, resp.Body)
-		return fmt.Errorf("unexpected status code %d:\n%v", resp.StatusCode, buf.String())
+
+		if i == 0 { // fmt with subject
+			json.NewEncoder(buf).Encode(Webhook{fmt.Sprintf("**%s**\n\n%s", a.Subject, a.Contents[i])})
+		} else {
+			json.NewEncoder(buf).Encode(Webhook{a.Contents[i]})
+		}
+
+		req, err := http.NewRequestWithContext(ctx, "POST", *webhook, buf)
+		req.Header.Set("Content-Type", "application/json")
+		if err != nil {
+			return err
+		}
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return err
+		}
+
+		defer resp.Body.Close()
+		if resp.StatusCode != 200 {
+			buf.Reset()
+			io.Copy(buf, resp.Body)
+			return fmt.Errorf("unexpected status code %d:\n%v", resp.StatusCode, buf.String())
+		}
 	}
 	return nil
 }

@@ -13,7 +13,7 @@ import (
 
 type Announcement struct {
 	Subject  string
-	Contents string
+	Contents []string
 }
 
 var converter = md.NewConverter("", true, &md.Options{
@@ -56,10 +56,7 @@ func Listen(ctx context.Context, im *imap.Dialer, announcements chan<- Announcem
 					continue
 				}
 
-				announcements <- Announcement{
-					Subject:  email.Subject,
-					Contents: formatContents(contents),
-				}
+				announcements <- formatAnnouncement(2000, email.Subject, contents)
 			}
 
 			// no emails were found, so dont bother removing nothing
@@ -67,7 +64,7 @@ func Listen(ctx context.Context, im *imap.Dialer, announcements chan<- Announcem
 				continue
 			}
 			if err := remove(im, toRemove); err != nil {
-				lit.Error("removing emails:", err)
+				lit.Error("removing emails: %v", err)
 			}
 		}
 	}
@@ -117,12 +114,50 @@ func remove(im *imap.Dialer, uids []int) error {
 
 var replacer = strings.NewReplacer("\n\n", "\n")
 
-func formatContents(text string) string {
-	text = replacer.Replace(text)
-	cutoff := strings.LastIndex(text, "\\-\\-")
-	if cutoff == -1 {
-		return text
+// formatAnnouncement formats an announcement from the given subject and contents
+//
+// it does a slightly ugly hack with maxLen to both make the announcement fit and pretty, so try to keep some leeway.
+func formatAnnouncement(maxLen int, subject string, body string) Announcement {
+	body = replacer.Replace(body)
+	body = strings.TrimSpace(body)
+
+	cutoff := strings.LastIndex(body, "\\-\\-")
+	if cutoff != -1 {
+		body = body[:cutoff]
+		body = strings.TrimSpace(body)
 	}
-	text = text[:cutoff]
-	return strings.TrimSpace(text)
+
+	var contents []string
+
+	currLen := len(subject) + len(body)
+	subLen := len(subject)
+	newMaxLen := maxLen
+	// will this fit into discord?
+	for currLen > newMaxLen {
+		i := strings.LastIndexAny(body[0:newMaxLen-subLen], "\n.;!?")
+		if i == -1 {
+			newMaxLen++
+			continue
+		} else {
+			i += 1
+		}
+
+		part := strings.TrimSpace(body[:i])
+		body = body[i:]
+		if part == "" {
+			continue
+		}
+
+		contents = append(contents, part)
+
+		// subsequent messages don't have the subject
+		subLen = 0
+		currLen = len(body)
+		newMaxLen = maxLen
+	}
+	if body != "" {
+		contents = append(contents, strings.TrimSpace(body))
+	}
+
+	return Announcement{Subject: subject, Contents: contents}
 }
