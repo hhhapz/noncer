@@ -6,11 +6,12 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/BrianLeishman/go-imap"
 	"io"
 	"net/http"
 	"strings"
 	"syscall"
+
+	"github.com/BrianLeishman/go-imap"
 
 	"os"
 	"os/signal"
@@ -84,7 +85,7 @@ func run(ctx context.Context) error {
 	}()
 
 	sc := make(chan os.Signal, 1)
-	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
+	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	<-sc
 	cancel()
 	return nil

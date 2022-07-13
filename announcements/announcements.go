@@ -115,11 +115,14 @@ func remove(im *imap.Dialer, uids []int) error {
 	return err
 }
 
+var replacer = strings.NewReplacer("\n\n", "\n")
+
 func formatContents(text string) string {
+	text = replacer.Replace(text)
 	cutoff := strings.LastIndex(text, "\\-\\-")
 	if cutoff == -1 {
 		return text
 	}
-	text = text[:cutoff]
-	return strings.TrimSpace(text)
+
+	return strings.TrimSpace(text[:cutoff])
 }
