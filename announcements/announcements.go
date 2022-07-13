@@ -123,6 +123,6 @@ func formatContents(text string) string {
 	if cutoff == -1 {
 		return text
 	}
-
-	return strings.TrimSpace(text[:cutoff])
+	text = text[:cutoff]
+	return strings.TrimSpace(text)
 }
