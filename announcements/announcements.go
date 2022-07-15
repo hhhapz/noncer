@@ -11,16 +11,12 @@ import (
 	"github.com/bwmarrin/lit"
 )
 
+const discordMessageSize = 1990
+
 type Announcement struct {
 	Subject  string
 	Contents []string
 }
-
-var converter = md.NewConverter("", true, &md.Options{
-	HeadingStyle:    "setext",
-	StrongDelimiter: "**",
-	LinkStyle:       "inlined",
-})
 
 func Listen(ctx context.Context, im *imap.Dialer, announcements chan<- Announcement, period int) error {
 	t := time.NewTicker(time.Duration(period) * time.Second)
@@ -50,13 +46,16 @@ func Listen(ctx context.Context, im *imap.Dialer, announcements chan<- Announcem
 					continue
 				}
 
-				contents, err := converter.ConvertString(email.HTML)
+				body, err := markdownBody(email.HTML)
 				if err != nil {
-					lit.Error("convert to html: %v", err)
+					lit.Error("create announcement: %v", err)
 					continue
 				}
 
-				announcements <- formatAnnouncement(1990, email.Subject, contents)
+				announcements <- Announcement{
+					Subject:  email.Subject,
+					Contents: buildContents(discordMessageSize, email.Subject, body),
+				}
 			}
 
 			// no emails were found, so dont bother removing nothing
@@ -112,52 +111,52 @@ func remove(im *imap.Dialer, uids []int) error {
 	return err
 }
 
-var replacer = strings.NewReplacer("\n\n", "\n")
+var converter = md.NewConverter("", true, &md.Options{
+	HeadingStyle:    "setext",
+	StrongDelimiter: "**",
+	LinkStyle:       "inlined",
+})
 
-// formatAnnouncement formats an announcement from the given subject and contents
+// markdownBody takes a html string and converts it into a formatted markdown body.
 //
-// it does a slightly ugly hack with maxLen to both make the announcement fit and pretty, so try to keep some leeway.
-func formatAnnouncement(maxLen int, subject string, body string) Announcement {
-	body = replacer.Replace(body)
-	body = strings.TrimSpace(body)
-
-	cutoff := strings.LastIndex(body, "\\-\\-")
-	if cutoff != -1 {
-		body = body[:cutoff]
-		body = strings.TrimSpace(body)
+// markdownBody also removes the signature and replaces double new lines with
+// single new lines.
+func markdownBody(raw string) (string, error) {
+	body, err := converter.ConvertString(raw)
+	if err != nil {
+		return "", fmt.Errorf("convert to html: %v", err)
 	}
 
-	var contents []string
+	signature := strings.LastIndex(body, "\\-\\-")
+	if signature != -1 {
+		body = body[:signature]
+	}
+	body = strings.ReplaceAll(body, "\n\n", "\n")
+	return strings.TrimSpace(body), nil
+}
 
-	currLen := len(subject) + len(body)
-	subLen := len(subject)
-	newMaxLen := maxLen
-	// will this fit into discord?
-	for currLen > newMaxLen {
-		i := strings.LastIndexAny(body[0:newMaxLen-subLen], "\n.;!?")
+// buildContents splits body into chunks so each fit within maxLen.
+//
+// The size of any element Contents will never exceed maxLen. For the first
+// item in Contents, Subject is also considered as part of the contents.
+func buildContents(maxLen int, subject, body string) (contents []string) {
+	max := maxLen - len(subject)
+	for max < len(body) {
+		body = strings.TrimSpace(body)
+
+		i := strings.LastIndexAny(body[:max], "\n.!")
+		// there are no new lines in the first max len chars
 		if i == -1 {
-			newMaxLen++
-			continue
-		} else {
-			i += 1
+			i = max - 1
 		}
 
-		part := strings.TrimSpace(body[:i])
-		body = body[i:]
-		if part == "" {
-			continue
-		}
-
-		contents = append(contents, part)
-
-		// subsequent messages don't have the subject
-		subLen = 0
-		currLen = len(body)
-		newMaxLen = maxLen
+		// use i+1 to include the last indexed character
+		contents = append(contents, body[:i+1])
+		body = body[i+1:]
+		max = maxLen
 	}
 	if body != "" {
-		contents = append(contents, strings.TrimSpace(body))
+		contents = append(contents, body)
 	}
-
-	return Announcement{Subject: subject, Contents: contents}
+	return contents
 }

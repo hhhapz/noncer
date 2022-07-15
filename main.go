@@ -8,13 +8,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"os/signal"
 	"strings"
 	"syscall"
 
 	"github.com/BrianLeishman/go-imap"
-
-	"os"
-	"os/signal"
 
 	"github.com/bwmarrin/lit"
 	"github.com/hhhapz/noncer/announcements"
@@ -96,11 +95,11 @@ func sendWebhook(ctx context.Context, a announcements.Announcement) error {
 	for i := range a.Contents {
 		buf.Reset()
 
-		if i == 0 { // fmt with subject
-			json.NewEncoder(buf).Encode(Webhook{fmt.Sprintf("**%s**\n\n%s", a.Subject, a.Contents[i])})
-		} else {
-			json.NewEncoder(buf).Encode(Webhook{a.Contents[i]})
+		msg := Webhook{a.Contents[i]}
+		if i == 0 {
+			msg = Webhook{fmt.Sprintf("**%s**\n\n%s", a.Subject, a.Contents[i])}
 		}
+		json.NewEncoder(buf).Encode(msg)
 
 		req, err := http.NewRequestWithContext(ctx, "POST", *webhook, buf)
 		req.Header.Set("Content-Type", "application/json")
