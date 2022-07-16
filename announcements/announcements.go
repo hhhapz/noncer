@@ -11,16 +11,12 @@ import (
 	"github.com/bwmarrin/lit"
 )
 
+const discordMessageSize = 1990
+
 type Announcement struct {
 	Subject  string
-	Contents string
+	Contents []string
 }
-
-var converter = md.NewConverter("", true, &md.Options{
-	HeadingStyle:    "setext",
-	StrongDelimiter: "**",
-	LinkStyle:       "inlined",
-})
 
 func Listen(ctx context.Context, im *imap.Dialer, announcements chan<- Announcement, period int) error {
 	t := time.NewTicker(time.Duration(period) * time.Second)
@@ -50,15 +46,15 @@ func Listen(ctx context.Context, im *imap.Dialer, announcements chan<- Announcem
 					continue
 				}
 
-				contents, err := converter.ConvertString(email.HTML)
+				body, err := markdownBody(email.HTML)
 				if err != nil {
-					lit.Error("convert to html: %v", err)
+					lit.Error("create announcement: %v", err)
 					continue
 				}
 
 				announcements <- Announcement{
 					Subject:  email.Subject,
-					Contents: formatContents(contents),
+					Contents: buildContents(discordMessageSize, email.Subject, body),
 				}
 			}
 
@@ -67,7 +63,7 @@ func Listen(ctx context.Context, im *imap.Dialer, announcements chan<- Announcem
 				continue
 			}
 			if err := remove(im, toRemove); err != nil {
-				lit.Error("removing emails:", err)
+				lit.Error("removing emails: %v", err)
 			}
 		}
 	}
@@ -115,11 +111,52 @@ func remove(im *imap.Dialer, uids []int) error {
 	return err
 }
 
-func formatContents(text string) string {
-	cutoff := strings.LastIndex(text, "\\-\\-")
-	if cutoff == -1 {
-		return text
+var converter = md.NewConverter("", true, &md.Options{
+	HeadingStyle:    "setext",
+	StrongDelimiter: "**",
+	LinkStyle:       "inlined",
+})
+
+// markdownBody takes a html string and converts it into a formatted markdown body.
+//
+// markdownBody also removes the signature and replaces double new lines with
+// single new lines.
+func markdownBody(raw string) (string, error) {
+	body, err := converter.ConvertString(raw)
+	if err != nil {
+		return "", fmt.Errorf("convert to html: %v", err)
 	}
-	text = text[:cutoff]
-	return strings.TrimSpace(text)
+
+	signature := strings.LastIndex(body, "\\-\\-")
+	if signature != -1 {
+		body = body[:signature]
+	}
+	body = strings.ReplaceAll(body, "\n\n", "\n")
+	return strings.TrimSpace(body), nil
+}
+
+// buildContents splits body into chunks so each fit within maxLen.
+//
+// The size of any element Contents will never exceed maxLen. For the first
+// item in Contents, Subject is also considered as part of the contents.
+func buildContents(maxLen int, subject, body string) (contents []string) {
+	max := maxLen - len(subject)
+	for max < len(body) {
+		body = strings.TrimSpace(body)
+
+		i := strings.LastIndexAny(body[:max], "\n.!")
+		// there are no new lines in the first max len chars
+		if i == -1 {
+			i = max - 1
+		}
+
+		// use i+1 to include the last indexed character
+		contents = append(contents, body[:i+1])
+		body = body[i+1:]
+		max = maxLen
+	}
+	if body != "" {
+		contents = append(contents, body)
+	}
+	return contents
 }

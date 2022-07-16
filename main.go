@@ -6,14 +6,14 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/BrianLeishman/go-imap"
 	"io"
 	"net/http"
+	"os"
+	"os/signal"
 	"strings"
 	"syscall"
 
-	"os"
-	"os/signal"
+	"github.com/BrianLeishman/go-imap"
 
 	"github.com/bwmarrin/lit"
 	"github.com/hhhapz/noncer/announcements"
@@ -84,7 +84,7 @@ func run(ctx context.Context) error {
 	}()
 
 	sc := make(chan os.Signal, 1)
-	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
+	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	<-sc
 	cancel()
 	return nil
@@ -92,21 +92,32 @@ func run(ctx context.Context) error {
 
 func sendWebhook(ctx context.Context, a announcements.Announcement) error {
 	buf := new(bytes.Buffer)
-	json.NewEncoder(buf).Encode(Webhook{fmt.Sprintf("**%s**\n\n%s", a.Subject, a.Contents)})
-	req, err := http.NewRequestWithContext(ctx, "POST", *webhook, buf)
-	req.Header.Set("Content-Type", "application/json")
-	if err != nil {
-		return err
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
+	for i := range a.Contents {
 		buf.Reset()
-		io.Copy(buf, resp.Body)
-		return fmt.Errorf("unexpected status code %d:\n%v", resp.StatusCode, buf.String())
+
+		msg := Webhook{a.Contents[i]}
+		if i == 0 {
+			msg = Webhook{fmt.Sprintf("**%s**\n\n%s", a.Subject, a.Contents[i])}
+		}
+		json.NewEncoder(buf).Encode(msg)
+
+		req, err := http.NewRequestWithContext(ctx, "POST", *webhook, buf)
+		req.Header.Set("Content-Type", "application/json")
+		if err != nil {
+			return err
+		}
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return err
+		}
+
+		defer resp.Body.Close()
+		if resp.StatusCode != 200 {
+			buf.Reset()
+			io.Copy(buf, resp.Body)
+			return fmt.Errorf("unexpected status code %d:\n%v", resp.StatusCode, buf.String())
+		}
 	}
 	return nil
 }
