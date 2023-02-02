@@ -113,7 +113,7 @@ func sendWebhook(ctx context.Context, a announcements.Announcement) error {
 		}
 
 		defer resp.Body.Close()
-		if resp.StatusCode != 200 {
+		if resp.StatusCode != 204 {
 			buf.Reset()
 			io.Copy(buf, resp.Body)
 			return fmt.Errorf("unexpected status code %d:\n%v", resp.StatusCode, buf.String())
