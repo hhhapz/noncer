@@ -31,20 +31,20 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
           - -user
-          - {{ .Values.email.user | quote }}
+          - "{{ .Values.email.user }}"
           - -host
-          - {{ .Values.email.host | quote }}
+          - "{{ .Values.email.host }}"
           - -port
-          - {{ .Values.email.port }}
+          - "{{ .Values.email.port }}"
           - -pass
-          - {{ .Values.email.password | quote }}
+          - "{{ .Values.email.password }}"
           - -period
-          - {{ .Values.bot.period | quote  }}
+          - "{{ .Values.bot.period }}"
           - -webhook
-          - {{ .Values.bot.webhook | quote }}
+          - "{{ .Values.bot.webhook }}"
           {{- range .Values.bot.allowList}}
           - -allowlist
-          - {{ . | quote }}
+          - "{{ . }}"
           {{- end }}  
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
