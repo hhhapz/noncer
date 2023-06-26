@@ -30,14 +30,21 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
-          - "-user {{ .Values.email.user }}"
-          - "-host {{ .Values.email.host }}"
-          - "-port {{ .Values.email.port }}"
-          - "-pass {{ .Values.email.password }}"
-          - "-period {{ .Values.bot.period }}"
-          - "-webhook {{ .Values.bot.webhook }}"
-          {{- range .Values.bot.allowList }}
-          - "-allowlist {{ . }}"
+          - -user
+          - {{ .Values.email.user | quote }}
+          - -host
+          - {{ .Values.email.host | quote }}
+          - -port
+          - {{ .Values.email.port }}
+          - -pass
+          - {{ .Values.email.password | quote }}
+          - -period
+          - {{ .Values.bot.period | quote  }}
+          - -webhook
+          - {{ .Values.bot.webhook | quote }}
+          {{- range .Values.bot.allowList}}
+          - -allowlist
+          - {{ . | quote }}
           {{- end }}  
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
