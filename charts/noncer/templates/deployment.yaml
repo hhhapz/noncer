@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "noncer.fullname" . }}
+  labels:
+    {{- include "noncer.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "noncer.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+      {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "noncer.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+          - -user
+          - "{{ .Values.email.user }}"
+          - -host
+          - "{{ .Values.email.host }}"
+          - -port
+          - "{{ .Values.email.port }}"
+          - -pass
+          - "{{ .Values.email.password }}"
+          - -period
+          - "{{ .Values.bot.period }}"
+          - -webhook
+          - "{{ .Values.bot.webhook }}"
+          {{- range .Values.bot.allowList}}
+          - -allowlist
+          - "{{ . }}"
+          {{- end }}  
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
